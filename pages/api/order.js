@@ -1,21 +1,29 @@
+// rajzkonyv/pages/api/order.js
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
   try {
-    const r = await fetch(process.env.GOOGLE_APPS_SCRIPT_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body || {}),
-    });
+    const sid =
+      req.method === 'GET'
+        ? (req.query.session_id || req.query.sessionId)
+        : (req.body?.session_id || req.body?.sessionId);
 
-    const ct = r.headers.get("content-type") || "";
-    const payload = ct.includes("application/json") ? await r.json() : await r.text();
+    if (!sid) {
+      return res.status(400).json({ error: 'missing_session_id' });
+    }
 
-    res.status(r.ok ? 200 : r.status).send(payload);
+    const base = process.env.GOOGLE_APPS_SCRIPT_URL;
+    if (!base) return res.status(500).json({ error: 'missing_env_GOOGLE_APPS_SCRIPT_URL' });
+
+    const url = `${base}?endpoint=checkout-session&session_id=${encodeURIComponent(sid)}`;
+
+    const r = await fetch(url, { method: 'GET' });
+    const text = await r.text();
+
+    let data;
+    try { data = JSON.parse(text); } catch { data = { raw: text }; }
+
+    res.status(r.ok ? 200 : r.status).json(data);
   } catch (err) {
-    console.error("GAS proxy error:", err);
-    res.status(500).json({ error: "Failed to call Apps Script" });
+    console.error('GAS proxy error:', err);
+    res.status(500).json({ error: 'proxy_failed' });
   }
 }
