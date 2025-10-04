@@ -1,6 +1,7 @@
 // rajzkonyv/pages/api/order.js
 export default async function handler(req, res) {
   try {
+    // session_id bárhonnan jöhet (GET query vagy JSON body)
     const sid =
       req.method === 'GET'
         ? (req.query.session_id || req.query.sessionId)
@@ -11,8 +12,11 @@ export default async function handler(req, res) {
     }
 
     const base = process.env.GOOGLE_APPS_SCRIPT_URL;
-    if (!base) return res.status(500).json({ error: 'missing_env_GOOGLE_APPS_SCRIPT_URL' });
+    if (!base) {
+      return res.status(500).json({ error: 'missing_env_GOOGLE_APPS_SCRIPT_URL' });
+    }
 
+    // GAS → ?endpoint=checkout-session&session_id=...
     const url = `${base}?endpoint=checkout-session&session_id=${encodeURIComponent(sid)}`;
 
     const r = await fetch(url, { method: 'GET' });
