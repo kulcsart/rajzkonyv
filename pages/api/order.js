@@ -7,13 +7,11 @@ export default async function handler(req, res) {
     const r = await fetch(process.env.GOOGLE_APPS_SCRIPT_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
+      body: JSON.stringify(req.body || {}),
     });
 
-    const contentType = r.headers.get("content-type") || "";
-    const payload = contentType.includes("application/json")
-      ? await r.json()
-      : await r.text();
+    const ct = r.headers.get("content-type") || "";
+    const payload = ct.includes("application/json") ? await r.json() : await r.text();
 
     res.status(r.ok ? 200 : r.status).send(payload);
   } catch (err) {
