@@ -1,93 +1,38 @@
-import { useEffect } from "react";
-import Stripe from "stripe";
+import { useEffect, useState } from "react";
 
-export async function getServerSideProps({ query }) {
-  const { session_id } = query || {};
-  if (!session_id) {
-    return { props: { error: "Hiányzó session_id." } };
-  }
-
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: "2024-06-20",
-  });
-
-  try {
-    const session = await stripe.checkout.sessions.retrieve(session_id, {
-      expand: ["line_items.data.price.product"],
-    });
-
-    const order = {
-      orderId: session.id,
-      size: session.metadata?.size ?? session.client_reference_id ?? null,
-      amount_total: session.amount_total ?? null,
-      currency: session.currency ?? null,
-      email: session.customer_details?.email ?? null,
-      payment_status: session.payment_status ?? null,
-      product_name:
-        session?.line_items?.data?.[0]?.price?.product?.name ??
-        session?.metadata?.product_name ??
-        null,
-    };
-
-    return { props: { order, session_id } };
-  } catch (err) {
-    return { props: { error: err.message || "Stripe hiba" } };
-  }
-}
-
-export default function Koszonjuk(props) {
-  if (props.error) {
-    return (
-      <main className="order-wrapper">
-        <p>Sikertelen betöltés: {props.error}</p>
-      </main>
-    );
-  }
-
-  const { orderId, size, amount_total, currency, email, payment_status, product_name } = props.order;
-  const { session_id } = props;
+export default function Koszonjuk() {
+  const [order, setOrder] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!session_id) return;
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get("session_id");
+    if (!sessionId) return;
+
     (async () => {
       try {
-        await fetch("/api/order", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            session_id,
-            order_id: orderId,
-            size,
-            amount_total,
-            currency,
-            email,
-            payment_status,
-            product_name,
-          }),
-        });
-      } catch (e) {
-        console.error(e);
+        const res = await fetch(`/api/order?session_id=${encodeURIComponent(sessionId)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        setOrder(data);
+      } catch (err) {
+        console.error("Fetch error:", err);
+        setError("Nem sikerült betölteni a rendelés adatait.");
       }
     })();
-  }, [session_id]);
+  }, []);
+
+  if (error) return <p>{error}</p>;
+  if (!order) return <p>Rendelés adatainak betöltése...</p>;
 
   return (
-    <main className="order-wrapper">
-      <p><span className="order-label">Rendelési azonosító:</span> <span className="order-value">{orderId}</span></p>
-      <p><span className="order-label">Választott méret:</span> <span className="order-value">{size}</span></p>
-      <p><span className="order-label">Összeg:</span> <span className="order-value">{formatAmount(amount_total, currency)}</span></p>
-      <p><span className="order-label">Vásárló e-mail:</span> <span className="order-value">{email}</span></p>
-      <p><span className="order-label">Fizetési státusz:</span> <span className="order-value">{payment_status}</span></p>
-      <p><span className="order-label">Termék neve:</span> <span className="order-value">{product_name}</span></p>
-    </main>
+    <div className="order-wrapper">
+      <h2>Köszönjük a megrendelést!</h2>
+      <p><strong>Rendelési azonosító:</strong> {order.sessionId}</p>
+      <p><strong>Választott méret:</strong> {order.size}</p>
+      <p><strong>Fizetési státusz:</strong> {order.payment_status}</p>
+      <p><strong>Összeg:</strong> {order.amount_total} {order.currency}</p>
+      <p><strong>Vásárló e-mail:</strong> {order.customer_email}</p>
+    </div>
   );
-}
-
-// helper
-function formatAmount(amount, currency) {
-  if (!amount) return "";
-  return new Intl.NumberFormat("hu-HU", {
-    style: "currency",
-    currency: currency || "HUF",
-  }).format(amount / 100);
 }
