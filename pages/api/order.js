@@ -1,34 +1,23 @@
-import Stripe from "stripe";
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2024-06-20" });
-
 export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
   try {
-    const { session_id } = req.query;
-    if (!session_id) return res.status(400).json({ error: "Missing session_id" });
-
-    const session = await stripe.checkout.sessions.retrieve(session_id, {
-      expand: ["line_items", "customer_details"],
+    const r = await fetch(process.env.GOOGLE_APPS_SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body),
     });
 
-    const size = session.metadata?.size || null;
-    const email = session.customer_details?.email || null;
-    const status = session.payment_status || null;
-    const currency = session.currency?.toUpperCase() || null;
-    const amount_total = session.amount_total ?? null;
-    const productName = session.line_items?.data?.[0]?.description || null;
+    const contentType = r.headers.get("content-type") || "";
+    const payload = contentType.includes("application/json")
+      ? await r.json()
+      : await r.text();
 
-    res.status(200).json({
-      id: session.id,
-      size,
-      email,
-      status,
-      currency,
-      amount_total,
-      productName,
-    });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "Failed to fetch order" });
+    res.status(r.ok ? 200 : r.status).send(payload);
+  } catch (err) {
+    console.error("GAS proxy error:", err);
+    res.status(500).json({ error: "Failed to call Apps Script" });
   }
 }

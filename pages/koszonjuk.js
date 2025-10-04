@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import Stripe from "stripe";
 
 export async function getServerSideProps({ query }) {
@@ -15,23 +16,20 @@ export async function getServerSideProps({ query }) {
       expand: ["line_items.data.price.product"],
     });
 
-    const firstItem = session.line_items?.data?.[0] || null;
-    const size = session.metadata?.size || session.client_reference_id || null;
-
-    return {
-      props: {
-        order: {
-          orderId: session.id,
-          size,
-          amount_total: session.amount_total ?? null,
-          currency: session.currency?.toUpperCase() || null,
-          email: session.customer_details?.email || null,
-          payment_status: session.payment_status || null,
-          product_name:
-            firstItem?.price?.product?.name || firstItem?.description || null,
-        },
-      },
+    const order = {
+      orderId: session.id,
+      size: session.metadata?.size ?? session.client_reference_id ?? null,
+      amount_total: session.amount_total ?? null,
+      currency: session.currency ?? null,
+      email: session.customer_details?.email ?? null,
+      payment_status: session.payment_status ?? null,
+      product_name:
+        session?.line_items?.data?.[0]?.price?.product?.name ??
+        session?.metadata?.product_name ??
+        null,
     };
+
+    return { props: { order, session_id } };
   } catch (err) {
     return { props: { error: err.message || "Stripe hiba" } };
   }
@@ -47,6 +45,31 @@ export default function Koszonjuk(props) {
   }
 
   const { orderId, size, amount_total, currency, email, payment_status, product_name } = props.order;
+  const { session_id } = props;
+
+  useEffect(() => {
+    if (!session_id) return;
+    (async () => {
+      try {
+        await fetch("/api/order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            session_id,
+            order_id: orderId,
+            size,
+            amount_total,
+            currency,
+            email,
+            payment_status,
+            product_name,
+          }),
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+  }, [session_id]);
 
   return (
     <main className="order-wrapper">

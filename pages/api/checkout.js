@@ -43,14 +43,14 @@ export default async function handler(req, res) {
   }
 
   try {
+    const base = (process.env.FRONTEND_URL || "https://www.rajzkonyv.hu").replace(/\/$/, "");
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: [{ price, quantity: 1 }],
       client_reference_id: size,
       metadata: { size },
-      success_url:
-        "https://www.rajzkonyv.hu/koszonjuk?siker=1&session_id={CHECKOUT_SESSION_ID}",
-      cancel_url: "https://www.rajzkonyv.hu/",
+      success_url: `${base}/koszonjuk?siker=1&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${base}/`,
     });
 
     return res.status(200).json({ url: session.url });
