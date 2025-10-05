@@ -66,6 +66,9 @@ export default async function handler(req, res) {
     // Egyébként JSON-t adunk vissza (pl. fejlesztői módhoz)
     return res.status(200).json({ url: data.url });
   } catch (err) {
-    return res.status(500).json({ error: 'checkout_error', message: err?.message || String(err) });
+    return res.status(500).json({ 
+      error: 'checkout_failed',
+      details: data?.error || err?.message || 'No Stripe response'
+    });
   }
 }
